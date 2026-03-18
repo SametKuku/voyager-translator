@@ -146,6 +146,14 @@ Get a free API key at [Google AI Studio](https://aistudio.google.com/app/apikey)
 
 ---
 
+## Standalone Version (React + TypeScript)
+
+Looking for a standalone web app without Laravel? Check out the original version built with React, TypeScript & Vite — no server required, just open in browser:
+
+**[voyager-translation-tool](https://github.com/SametKuku/voyager-translation-tool)** — Upload a SQL dump, auto-translate Voyager content, export SQL. Runs entirely in the browser.
+
+---
+
 ## License
 
 MIT

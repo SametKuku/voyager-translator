@@ -10,7 +10,7 @@ Auto-translate your entire Laravel application — **lang/ files** (PHP + JSON) 
 ## Installation
 
 ```bash
-composer require sametkuku/laravel-voyager-translator
+composer require sametkuku/voyager-translator
 ```
 
 Publish the config (optional):

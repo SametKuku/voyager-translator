@@ -1,7 +1,7 @@
 {
-    "name": "sametkuku/laravel-voyager-translator",
-    "description": "Laravel Artisan command to auto-translate Voyager CMS content using Gemini AI or Google Translate. Supports 14 languages, HTML-safe translation, and slug handling.",
-    "keywords": ["laravel", "voyager", "translation", "gemini", "i18n"],
+    "name": "sametkuku/voyager-translator",
+    "description": "Auto-translate Laravel lang/ files and Voyager CMS content using Gemini AI or Google Translate. Web UI included. Supports 15 languages.",
+    "keywords": ["laravel", "voyager", "translation", "gemini", "google-translate", "i18n", "localization"],
     "license": "MIT",
     "authors": [
         {

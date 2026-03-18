@@ -28,7 +28,7 @@
         };
     </script>
 </head>
-<body class="bg-slate-50 min-h-screen" x-data="app()" x-cloak>
+<body class="bg-slate-50 min-h-screen relative" x-data="app()" x-cloak>
 
 {{-- ═══ HEADER ═══════════════════════════════════════════════════════════════ --}}
 <header class="bg-gradient-to-r from-indigo-700 to-violet-700 text-white shadow-xl">
@@ -550,7 +550,7 @@
                 </template>
             </div>
             <div class="flex flex-wrap gap-3">
-                <button @click="voySave()" :disabled="voy.saving"
+                <button @click="voy.confirmSave = true" :disabled="voy.saving || voy.savedCount > 0"
                     class="px-5 py-2.5 bg-emerald-600 text-white text-sm font-semibold rounded-lg hover:bg-emerald-700 disabled:opacity-50 transition-colors flex items-center gap-2 shadow-sm">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
                     <span x-text="voy.saving ? 'Saving…' : (voy.savedCount ? 'Saved ' + voy.savedCount.toLocaleString() + ' rows ✓' : 'Save to Database')"></span>
@@ -566,6 +566,59 @@
             </div>
         </div>
     </div>
+    </template>
+
+    {{-- ── Confirm Save Modal ───────────────────────────────────────────── --}}
+    <template x-if="voy.confirmSave">
+        <div class="fixed inset-0 z-50 flex items-center justify-center p-4" style="background:rgba(0,0,0,0.45)">
+            <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 fade-in">
+                <div class="flex items-center gap-3 mb-4">
+                    <div class="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+                        <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-slate-800">Save to Database?</h3>
+                        <p class="text-xs text-slate-500 mt-0.5">This will write directly to your connected database</p>
+                    </div>
+                </div>
+
+                <div class="bg-slate-50 rounded-xl p-4 mb-5 text-sm text-slate-700 space-y-1.5">
+                    <div class="flex justify-between">
+                        <span class="text-slate-500">Locales</span>
+                        <span class="font-semibold" x-text="voy.completedLocales.map(l => langName(l)).join(', ')"></span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-500">Table</span>
+                        <code class="font-semibold">translations</code>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-500">Method</span>
+                        <span class="font-semibold">updateOrInsert (safe)</span>
+                    </div>
+                </div>
+
+                <p class="text-xs text-slate-500 mb-5">
+                    Existing rows will be updated. New rows will be inserted. This action cannot be automatically undone — consider downloading SQL backup first.
+                </p>
+
+                <div class="flex gap-3">
+                    <button @click="voy.confirmSave = false; voyExportSql()"
+                        class="flex-1 px-4 py-2.5 border border-slate-200 text-slate-600 text-sm rounded-lg hover:bg-slate-50 transition-colors">
+                        Download SQL first
+                    </button>
+                    <button @click="voy.confirmSave = false; voySave()"
+                        class="flex-1 px-4 py-2.5 bg-emerald-600 text-white text-sm font-semibold rounded-lg hover:bg-emerald-700 transition-colors">
+                        Yes, Save Now
+                    </button>
+                </div>
+
+                <button @click="voy.confirmSave = false" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+        </div>
     </template>
 
 </div>{{-- /voyager mode --}}
@@ -614,7 +667,7 @@ function app() {
             detectedLang: 'en', sourceLang: 'en', targets: [],
             translating: false, progress: {}, completedLocales: [],
             status: '', txError: '',
-            saving: false, savedCount: 0, error: '', notice: '',
+            saving: false, savedCount: 0, error: '', notice: '', confirmSave: false,
         },
 
         switchMode(m) {

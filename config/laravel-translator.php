@@ -9,7 +9,7 @@ return [
     | "gemini"  → Google Gemini AI (requires GEMINI_API_KEY)
     | "gtx"     → Google Translate (free, no key required)
     */
-    'engine' => env('VOYAGER_TRANSLATOR_ENGINE', 'gtx'),
+    'engine' => env('LARAVEL_TRANSLATOR_ENGINE', 'gtx'),
 
     /*
     |--------------------------------------------------------------------------
@@ -24,21 +24,21 @@ return [
     | Gemini Model
     |--------------------------------------------------------------------------
     */
-    'gemini_model' => env('VOYAGER_TRANSLATOR_GEMINI_MODEL', 'gemini-2.5-flash'),
+    'gemini_model' => env('LARAVEL_TRANSLATOR_GEMINI_MODEL', 'gemini-2.5-flash'),
 
     /*
     |--------------------------------------------------------------------------
     | Default Source Locale
     |--------------------------------------------------------------------------
     */
-    'source_locale' => env('VOYAGER_TRANSLATOR_SOURCE', 'tr'),
+    'source_locale' => env('LARAVEL_TRANSLATOR_SOURCE', 'en'),
 
     /*
     |--------------------------------------------------------------------------
     | Default Target Locales (Artisan command)
     |--------------------------------------------------------------------------
     */
-    'target_locales' => env('VOYAGER_TRANSLATOR_TARGETS', 'en,es,ru,ar'),
+    'target_locales' => env('LARAVEL_TRANSLATOR_TARGETS', 'tr,es,ru,ar'),
 
     /*
     |--------------------------------------------------------------------------
@@ -53,9 +53,9 @@ return [
     | Web UI Route Prefix
     |--------------------------------------------------------------------------
     | The URL prefix for the web interface. Access at /{route_prefix}
-    | Default: /voyager-translator
+    | Default: /laravel-translator
     */
-    'route_prefix' => env('VOYAGER_TRANSLATOR_PREFIX', 'voyager-translator'),
+    'route_prefix' => env('LARAVEL_TRANSLATOR_PREFIX', 'laravel-translator'),
 
     /*
     |--------------------------------------------------------------------------

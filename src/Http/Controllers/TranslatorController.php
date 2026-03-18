@@ -576,23 +576,37 @@ class TranslatorController extends Controller
     /**
      * Build translation groups from raw model table data.
      * Model data keys: "tableName:id:column" → value
+     * Filters out URLs, emails, pure numbers, and very short strings.
      */
     private function buildGroupsFromModelData(array $modelData, string $sourceLang): array
     {
         $groups = [];
+
         foreach ($modelData as $key => $value) {
             $parts = explode(':', $key, 3);
             if (count($parts) !== 3) continue;
             [$table, $id, $column] = $parts;
 
-            $groupKey = "{$table}:{$column}:{$id}";
+            $value = (string) $value;
+
+            // Skip non-translatable content
+            if (mb_strlen($value) < 3)                                  continue; // too short
+            if (is_numeric($value))                                      continue; // pure number
+            if (preg_match('/^https?:\/\//i', $value))                  continue; // URL
+            if (preg_match('/^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/', $value)) continue; // email
+            if (preg_match('/^#[0-9a-fA-F]{3,8}$/', $value))           continue; // hex color
+            if (preg_match('/^\d{4}-\d{2}-\d{2}/', $value))             continue; // date
+            if (!preg_match('/[a-zA-Z\p{L}]/u', $value))                continue; // no letters at all
+
+            $groupKey          = "{$table}:{$column}:{$id}";
             $groups[$groupKey] = [
                 'table_name'  => $table,
                 'column_name' => $column,
                 'foreign_key' => $id,
-                'locales'     => [$sourceLang => (string) $value],
+                'locales'     => [$sourceLang => $value],
             ];
         }
+
         return array_values($groups);
     }
 

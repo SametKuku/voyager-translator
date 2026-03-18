@@ -380,21 +380,29 @@
             </div>
 
             <template x-if="voy.loaded">
-                <div class="mt-5 bg-emerald-50 border border-emerald-200 rounded-xl p-4 fade-in">
-                    <div class="flex items-center gap-2 mb-3">
-                        <div class="w-2.5 h-2.5 rounded-full bg-emerald-500"></div>
-                        <span class="text-sm font-semibold text-emerald-800">
-                            Loaded <span x-text="voy.totalGroups.toLocaleString()"></span> translation groups
-                        </span>
+                <div class="mt-5 space-y-3">
+                    <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-4 fade-in">
+                        <div class="flex items-center gap-2 mb-3">
+                            <div class="w-2.5 h-2.5 rounded-full bg-emerald-500"></div>
+                            <span class="text-sm font-semibold text-emerald-800">
+                                Loaded <span x-text="voy.totalGroups.toLocaleString()"></span> translation rows
+                            </span>
+                        </div>
+                        <div class="flex flex-wrap gap-2">
+                            <template x-for="(count, locale) in voy.localeStats" :key="locale">
+                                <div class="flex items-center gap-1.5 px-2.5 py-1 bg-white border border-emerald-200 rounded-full text-xs">
+                                    <span class="font-mono font-bold text-slate-700" x-text="locale.toUpperCase()"></span>
+                                    <span class="text-slate-400" x-text="count.toLocaleString()"></span>
+                                </div>
+                            </template>
+                        </div>
                     </div>
-                    <div class="flex flex-wrap gap-2">
-                        <template x-for="(count, locale) in voy.localeStats" :key="locale">
-                            <div class="flex items-center gap-1.5 px-2.5 py-1 bg-white border border-emerald-200 rounded-full text-xs">
-                                <span class="font-mono font-bold text-slate-700" x-text="locale.toUpperCase()"></span>
-                                <span class="text-slate-400" x-text="count.toLocaleString()"></span>
-                            </div>
-                        </template>
-                    </div>
+                    <template x-if="voy.notice">
+                        <div class="bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded-xl px-4 py-3 fade-in flex items-start gap-2">
+                            <span class="text-amber-500 mt-0.5">ℹ️</span>
+                            <span x-text="voy.notice"></span>
+                        </div>
+                    </template>
                 </div>
             </template>
 
@@ -789,7 +797,27 @@ function app() {
             this.voy.detectedLang = r.detected_lang;
             this.voy.sourceLang   = r.detected_lang;
             this.voy.loaded       = true;
-            this.voy.targets      = Object.keys(r.locale_stats).filter(l => l !== r.detected_lang);
+
+            // Pre-select existing target locales from the data
+            let targets = Object.keys(r.locale_stats).filter(l => l !== r.detected_lang);
+
+            // If no target locales exist (fresh SQL / model-table source), suggest sensible defaults
+            if (targets.length === 0) {
+                const defaults = {
+                    tr: ['en', 'ar', 'ru', 'de'],
+                    en: ['tr', 'es', 'ar', 'ru', 'de'],
+                    ru: ['en', 'tr', 'de'],
+                    ar: ['en', 'tr', 'fr'],
+                    de: ['en', 'tr', 'ru'],
+                    fr: ['en', 'tr', 'ar'],
+                    zh: ['en', 'tr'],
+                    ja: ['en'],
+                    ko: ['en'],
+                };
+                targets = defaults[r.detected_lang] || ['en', 'tr'];
+            }
+
+            this.voy.targets = targets;
         },
 
         voyToggleTarget(code) {

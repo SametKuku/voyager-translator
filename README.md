@@ -14,7 +14,7 @@ Auto-translate your entire Laravel application — **lang/ files** (PHP + JSON) 
 ## Installation
 
 ```bash
-composer require laraveltools/voyager-translator
+composer require laratoolkit/voyager-translator
 ```
 
 Publish the config (optional):

@@ -1,5 +1,5 @@
 {
-    "name": "laraveltools/voyager-translator",
+    "name": "laratoolkit/voyager-translator",
     "description": "Auto-translate Laravel lang/ files and Voyager CMS content using Gemini AI or Google Translate. Web UI included. Supports 15 languages.",
     "keywords": ["laravel", "voyager", "translation", "gemini", "google-translate", "i18n", "localization"],
     "license": "MIT",

@@ -13,6 +13,8 @@ use SametKuku\VoyagerTranslator\Helpers\SlugHelper;
 use SametKuku\VoyagerTranslator\Helpers\SqlParser;
 use SametKuku\VoyagerTranslator\Services\GeminiTranslator;
 use SametKuku\VoyagerTranslator\Services\GoogleTranslator;
+use SametKuku\VoyagerTranslator\Services\LangFileScanner;
+use SametKuku\VoyagerTranslator\Services\LangFileWriter;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class TranslatorController extends Controller
@@ -324,6 +326,205 @@ class TranslatorController extends Controller
             'translations.json',
             ['Content-Type' => 'application/json; charset=utf-8']
         );
+    }
+
+    // =========================================================================
+    // Lang File Mode
+    // =========================================================================
+
+    /**
+     * Scan lang/ directory and return metadata.
+     */
+    public function scanLang(): JsonResponse
+    {
+        $langPath = lang_path();
+        $scanner  = new LangFileScanner();
+        $info     = $scanner->scan($langPath);
+
+        return response()->json([
+            'success'  => true,
+            'path'     => $langPath,
+            'locales'  => $info['locales'],
+            'php_files'=> $info['phpFiles'],
+            'stats'    => $info['stats'],
+        ]);
+    }
+
+    /**
+     * Load all lang strings for the chosen source locale into cache.
+     */
+    public function loadLang(Request $request): JsonResponse
+    {
+        $request->validate(['source_lang' => 'required|string']);
+
+        $langPath    = lang_path();
+        $sourceLang  = $request->input('source_lang');
+        $scanner     = new LangFileScanner();
+        $strings     = $scanner->readLocale($langPath, $sourceLang);
+
+        if (empty($strings)) {
+            return response()->json(['success' => false, 'error' => "No strings found for locale '{$sourceLang}' in {$langPath}"], 400);
+        }
+
+        $id = Str::random(20);
+        Cache::put("vt_{$id}_lang_strings", $strings, self::CACHE_TTL);
+
+        return response()->json([
+            'success'     => true,
+            'id'          => $id,
+            'total'       => count($strings),
+            'source_lang' => $sourceLang,
+        ]);
+    }
+
+    /**
+     * Translate one batch of lang strings.
+     */
+    public function translateLangBatch(Request $request): JsonResponse
+    {
+        $v = $request->validate([
+            'id'          => 'required|string',
+            'locale'      => 'required|string',
+            'batch_index' => 'required|integer|min:0',
+            'batch_size'  => 'required|integer|min:1|max:200',
+            'engine'      => 'nullable|string|in:gemini,gtx',
+            'gemini_key'  => 'nullable|string',
+        ]);
+
+        $id         = $v['id'];
+        $locale     = $v['locale'];
+        $batchIndex = (int) $v['batch_index'];
+        $batchSize  = (int) $v['batch_size'];
+        $engine     = $v['engine'] ?? config('voyager-translator.engine', 'gtx');
+        $geminiKey  = $v['gemini_key'] ?? config('voyager-translator.gemini_api_key');
+
+        $strings = Cache::get("vt_{$id}_lang_strings");
+        if (!$strings) {
+            return response()->json(['success' => false, 'error' => 'Session expired. Please reload.'], 400);
+        }
+
+        $keys   = array_keys($strings);
+        $total  = count($keys);
+        $offset = $batchIndex * $batchSize;
+
+        if ($offset >= $total) {
+            return response()->json(['success' => true, 'done' => true, 'total' => $total]);
+        }
+
+        $batchKeys   = array_slice($keys, $offset, $batchSize);
+        $batchValues = array_map(fn($k) => $strings[$k], $batchKeys);
+
+        $translator = $this->buildTranslator($engine, $geminiKey);
+        if (!$translator) {
+            return response()->json(['success' => false, 'error' => 'Could not initialize translator. Check API key.'], 400);
+        }
+
+        // Protect Laravel placeholders (:attribute, :name, etc.) + HTML
+        $protectors  = [];
+        $maskedValues = [];
+        foreach ($batchValues as $i => $text) {
+            $p = new HtmlProtector();
+            // Also protect :placeholder tokens common in lang files
+            $masked = preg_replace_callback('/:[a-z_]+\b/', function ($m) use ($p) {
+                return $p->protect($m[0]);
+            }, $p->protect($text));
+            $protectors[$i]   = $p;
+            $maskedValues[$i] = $masked;
+        }
+
+        try {
+            $translated = $translator->translateBatch(array_values($maskedValues), $locale);
+
+            // Restore protected tokens
+            foreach ($translated as $i => $text) {
+                $translated[$i] = $protectors[$i]->restore($text);
+            }
+
+            // Persist results
+            $cacheKey = "vt_{$id}_lang_results_{$locale}";
+            $existing = Cache::get($cacheKey, []);
+            foreach ($batchKeys as $i => $key) {
+                $existing[$key] = $translated[$i] ?? $batchValues[$i];
+            }
+            Cache::put($cacheKey, $existing, self::CACHE_TTL);
+
+            $done = ($offset + count($batchKeys)) >= $total;
+
+            return response()->json([
+                'success'  => true,
+                'done'     => $done,
+                'progress' => (int) round(($offset + count($batchKeys)) / $total * 100),
+                'total'    => $total,
+                'done_count' => $offset + count($batchKeys),
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Write translated files directly to lang/.
+     */
+    public function writeLangFiles(Request $request): JsonResponse
+    {
+        $request->validate([
+            'id'      => 'required|string',
+            'locales' => 'required|array',
+        ]);
+
+        $id      = $request->input('id');
+        $locales = $request->input('locales');
+        $writer  = new LangFileWriter();
+
+        $written = 0;
+        foreach ($locales as $locale) {
+            $results = Cache::get("vt_{$id}_lang_results_{$locale}", []);
+            if (empty($results)) continue;
+
+            try {
+                $writer->writeLocale(lang_path(), $locale, $results);
+                $written += count($results);
+            } catch (\Exception $e) {
+                return response()->json(['success' => false, 'error' => "Write failed for {$locale}: " . $e->getMessage()], 500);
+            }
+        }
+
+        return response()->json(['success' => true, 'written' => $written]);
+    }
+
+    /**
+     * Export all translated lang files as a ZIP archive.
+     */
+    public function exportLangZip(Request $request): StreamedResponse|\Illuminate\Http\JsonResponse
+    {
+        if (!class_exists(\ZipArchive::class)) {
+            return response()->json(['error' => 'ZipArchive PHP extension is not available.'], 500);
+        }
+
+        $id      = $request->query('id', '');
+        $locales = array_filter(explode(',', $request->query('locales', '')));
+        $writer  = new LangFileWriter();
+        $tmpFile = tempnam(sys_get_temp_dir(), 'vt_lang_') . '.zip';
+
+        $zip = new \ZipArchive();
+        $zip->open($tmpFile, \ZipArchive::CREATE | \ZipArchive::OVERWRITE);
+
+        foreach ($locales as $locale) {
+            $results = Cache::get("vt_{$id}_lang_results_{$locale}", []);
+            if (empty($results)) continue;
+
+            $fileMap = $writer->buildFileMap($locale, $results);
+            foreach ($fileMap as $path => $content) {
+                $zip->addFromString($path, $content);
+            }
+        }
+
+        $zip->close();
+
+        return response()->streamDownload(function () use ($tmpFile) {
+            readfile($tmpFile);
+            @unlink($tmpFile);
+        }, 'lang-translations.zip', ['Content-Type' => 'application/zip']);
     }
 
     // -------------------------------------------------------------------------

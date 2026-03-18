@@ -1,12 +1,11 @@
-# Laravel Voyager Translator
+# Laravel Translator
 
-Laravel package to auto-translate [Laravel Voyager](https://voyager.devdojo.com/) CMS content using **Gemini AI** or **Google Translate**. Supports 15 languages, HTML-safe translation, slug handling, and comes with a built-in **web UI**.
+Auto-translate your entire Laravel application — **lang/ files** (PHP + JSON) and **Voyager CMS** database content — using **Gemini AI** or **Google Translate**. Supports 15 languages with a built-in web UI.
 
 ## Requirements
 
 - PHP 8.1+
 - Laravel 10, 11, or 12
-- Laravel Voyager (with `translations` table)
 
 ## Installation
 
@@ -22,40 +21,49 @@ php artisan vendor:publish --tag=voyager-translator-config
 
 ## Web UI
 
-After installation, open your browser at:
+Open your browser at:
 
 ```
 http://your-app.test/voyager-translator
 ```
 
-The UI lets you:
+### Lang Files Tab
+Translate your `lang/` PHP and JSON files:
 
-1. **Load from DB** — reads directly from your connected database
-2. **Upload SQL** — upload a `.sql` dump file; language is auto-detected
-3. **Select languages** — source auto-detected, pick your target locales
-4. **Choose engine** — Google Translate (free) or Gemini AI (API key)
-5. **Translate** — real-time progress bar per language
-6. **Save or Export** — write to DB, download `.sql` or `.json`
+1. **Scan** — detects all locales and key counts in your `lang/` directory
+2. **Load Strings** — loads all translatable strings for the selected source locale
+3. **Select targets** — choose which languages to translate into
+4. **Choose engine** — Google Translate (free) or Gemini AI
+5. **Translate** — real-time per-language progress bar
+6. **Write to disk** — saves files directly to `lang/{locale}/`  OR  **Download ZIP** — review files before writing
+
+### Voyager / DB Tab
+Translate Voyager CMS `translations` table entries:
+
+1. **Load from DB** or **Upload SQL** dump
+2. Source language auto-detected; select targets
+3. Translate with real-time progress
+4. **Save to DB**, **Download SQL**, or **Download JSON**
 
 > Add `'auth'` to the `middleware` config key to protect the route.
 
 ## Artisan Command
 
 ```bash
-# Basic — uses .env settings
-php artisan voyager:translate
+# Translate lang/ files
+php artisan translate --mode=files --from=en --to=tr,es,ru,ar
 
-# Override source and targets
-php artisan voyager:translate --from=tr --to=en,es,ru,ar
+# Translate Voyager DB
+php artisan translate --mode=voyager --from=tr --to=en,es,ru
 
 # Use Gemini AI
-php artisan voyager:translate --engine=gemini --from=tr --to=en,es,ru
+php artisan translate --mode=files --engine=gemini --from=en --to=tr,es
 
-# Only translate missing/empty rows
-php artisan voyager:translate --only-empty
+# Only translate missing keys
+php artisan translate --only-missing
 
-# Preview without saving
-php artisan voyager:translate --dry-run
+# Preview without writing
+php artisan translate --dry-run
 ```
 
 ## Configuration
@@ -68,10 +76,10 @@ VOYAGER_TRANSLATOR_ENGINE=gemini
 GEMINI_API_KEY=your_key_here
 
 # Source locale (auto-detected in web UI)
-VOYAGER_TRANSLATOR_SOURCE=tr
+VOYAGER_TRANSLATOR_SOURCE=en
 
 # Target locales for Artisan command
-VOYAGER_TRANSLATOR_TARGETS=en,es,ru,ar
+VOYAGER_TRANSLATOR_TARGETS=tr,es,ru,ar
 
 # Web UI route prefix (default: voyager-translator)
 VOYAGER_TRANSLATOR_PREFIX=voyager-translator
@@ -92,20 +100,26 @@ VOYAGER_TRANSLATOR_PREFIX=voyager-translator
 
 ## How It Works
 
-1. Reads rows from the `translations` table (or parses an uploaded SQL file)
-2. Detects the source language automatically from content
-3. Sends text to the chosen engine in batches
-4. HTML tags and Blade/Laravel placeholders are protected during translation
-5. Slug columns are transliterated to URL-safe format (Turkish, Arabic, Cyrillic)
-6. Results saved to the `translations` table via `updateOrInsert`, or exported as SQL/JSON
+### Lang Files Mode
+1. Scans `lang/{locale}/` directories for PHP files + JSON files
+2. Flattens nested arrays to `file.key` → `value` pairs
+3. Protects Laravel placeholders (`:attribute`, `:name`) and HTML during translation
+4. Reconstructs nested structure and writes valid PHP array files or JSON files
+
+### Voyager Mode
+1. Reads rows from the `translations` table (or parses a SQL dump)
+2. Detects source language from content
+3. HTML-safe translation with `XTAG0X` token protection
+4. Slug columns auto-transliterated (Turkish, Arabic, Cyrillic → Latin)
+5. Saves via `updateOrInsert` or exports as SQL/JSON
 
 ## Engines
 
 ### Google Translate (GTX) — Free
-Uses the unofficial GTX endpoint. No API key needed.
+No API key. Works out of the box.
 
 ### Gemini AI — Fast & accurate
-Uses `gemini-2.5-flash` with bulk requests (up to 40 items per call). Get a free API key at [Google AI Studio](https://aistudio.google.com/app/apikey).
+Uses `gemini-2.5-flash` with bulk requests (up to 60 items/call). Get a free API key at [Google AI Studio](https://aistudio.google.com/app/apikey).
 
 ## License
 
